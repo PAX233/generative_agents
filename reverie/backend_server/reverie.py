@@ -28,12 +28,11 @@ import os
 import shutil
 import traceback
 
-from selenium import webdriver
-
 from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from persona.prompt_template import llm_client
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -57,6 +56,11 @@ class ReverieServer:
     sim_folder = f"{fs_storage}/{self.sim_code}"
     copyanything(fork_folder, sim_folder)
 
+    # Git does not track empty folders, but the simulation writes into these
+    # two directories, so make sure they exist for a freshly forked world.
+    for sub_folder in ["environment", "movement"]:
+      os.makedirs(f"{sim_folder}/{sub_folder}", exist_ok=True)
+
     with open(f"{sim_folder}/reverie/meta.json") as json_file:  
       reverie_meta = json.load(json_file)
 
@@ -79,6 +83,12 @@ class ReverieServer:
     # progresses (that is, everytime curr_env_file is recieved). 
     self.curr_time = datetime.datetime.strptime(reverie_meta['curr_time'], 
                                                 "%B %d, %Y, %H:%M:%S")
+    # Optional demo/test override, e.g. GA_START_TIME="February 13, 2023, 08:00:00".
+    # Useful to reproduce a specific time of day without simulating the night.
+    start_time_override = os.environ.get("GA_START_TIME", "").strip()
+    if start_time_override: 
+      self.curr_time = datetime.datetime.strptime(start_time_override, 
+                                                  "%B %d, %Y, %H:%M:%S")
     # <sec_per_step> denotes the number of seconds in game time that each 
     # step moves foward. 
     self.sec_per_step = reverie_meta['sec_per_step']
@@ -440,6 +450,7 @@ class ReverieServer:
           # Finishes the simulation environment and saves the progress. 
           # Example: fin
           self.save()
+          print (llm_client.summary())
           break
 
         elif sim_command.lower() == "start path tester mode": 

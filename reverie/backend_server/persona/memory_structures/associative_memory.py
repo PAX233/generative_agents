@@ -15,6 +15,9 @@ import datetime
 
 from global_methods import *
 
+from persona.prompt_template import embedding_client
+from persona.prompt_template.embedding_client import embedding_dim, embed_batch
+
 
 class ConceptNode: 
   def __init__(self,
@@ -65,6 +68,23 @@ class AssociativeMemory:
     self.embeddings = json.load(open(f_saved + "/embeddings.json"))
 
     nodes_load = json.load(open(f_saved + "/nodes.json"))
+
+    # DeepSeek port note: the upstream simulations were saved with OpenAI
+    # text-embedding-ada-002 vectors (1536-d). The local embedding model is
+    # 384-d, so vectors that do not match the current backend are recomputed
+    # from their stored embedding keys before the nodes are loaded.
+    if self.embeddings: 
+      sample_vector = next(iter(self.embeddings.values()))
+      if len(sample_vector) != embedding_dim(): 
+        print (f"[memory] embeddings have dimension {len(sample_vector)}, "
+               f"recomputing {len(self.embeddings)} with "
+               f"{embedding_client.backend_name()} ...")
+        embedding_keys = list(dict.fromkeys(
+          node_details["embedding_key"] 
+          for node_details in nodes_load.values()))
+        self.embeddings = dict(zip(embedding_keys, 
+                                   embed_batch(embedding_keys)))
+
     for count in range(len(nodes_load.keys())): 
       node_id = f"node_{str(count+1)}"
       node_details = nodes_load[node_id]

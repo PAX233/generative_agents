@@ -6,24 +6,52 @@ Description: Wrapper functions for calling OpenAI APIs.
 """
 import json
 import random
-import openai
-import time 
+import re
+import time
 
 from utils import *
-
-openai.api_key = openai_api_key
+from persona.prompt_template import llm_client
+from persona.prompt_template import embedding_client
 
 def temp_sleep(seconds=0.1):
   time.sleep(seconds)
 
+
+def extract_json_output(text): 
+  """
+  Models often wrap the requested JSON in markdown fences or add a sentence
+  around it. This pulls out the {"output": ...} object and returns its
+  "output" value (as a string), or None when no valid object could be read.
+  """
+  if not text: 
+    return None
+  cleaned = text.strip()
+  if cleaned.startswith("```"): 
+    cleaned = cleaned.strip("`").strip()
+    if cleaned[:4].lower() == "json": 
+      cleaned = cleaned[4:].strip()
+
+  start = cleaned.find("{")
+  end = cleaned.rfind("}")
+  if start != -1 and end != -1 and end > start: 
+    try: 
+      return str(json.loads(cleaned[start:end+1])["output"])
+    except Exception: 
+      pass
+
+  match = re.search(r'"output"\s*:\s*"(.*)"\s*\}', cleaned, re.S)
+  if match: 
+    value = match.group(1).replace('\\"', '"').replace("\\n", "\n")
+    return value
+  match = re.search(r'"output"\s*:\s*(-?[0-9]+(?:\.[0-9]+)?)', cleaned)
+  if match: 
+    return match.group(1)
+  return None
+
 def ChatGPT_single_request(prompt): 
   temp_sleep()
 
-  completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo", 
-    messages=[{"role": "user", "content": prompt}]
-  )
-  return completion["choices"][0]["message"]["content"]
+  return llm_client.chat(prompt, max_tokens=1500, tag="single_request")
 
 
 # ============================================================================
@@ -45,14 +73,10 @@ def GPT4_request(prompt):
   temp_sleep()
 
   try: 
-    completion = openai.ChatCompletion.create(
-    model="gpt-4", 
-    messages=[{"role": "user", "content": prompt}]
-    )
-    return completion["choices"][0]["message"]["content"]
-  
-  except: 
-    print ("ChatGPT ERROR")
+    return llm_client.chat_large(prompt, max_tokens=2000,
+                                 tag="gpt4_request")
+  except Exception as exc: 
+    print ("ChatGPT ERROR", exc)
     return "ChatGPT ERROR"
 
 
@@ -70,14 +94,9 @@ def ChatGPT_request(prompt):
   """
   # temp_sleep()
   try: 
-    completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo", 
-    messages=[{"role": "user", "content": prompt}]
-    )
-    return completion["choices"][0]["message"]["content"]
-  
-  except: 
-    print ("ChatGPT ERROR")
+    return llm_client.chat(prompt, max_tokens=2000, tag="chatgpt_request")
+  except Exception as exc: 
+    print ("ChatGPT ERROR", exc)
     return "ChatGPT ERROR"
 
 
@@ -101,10 +120,9 @@ def GPT4_safe_generate_response(prompt,
   for i in range(repeat): 
 
     try: 
-      curr_gpt_response = GPT4_request(prompt).strip()
-      end_index = curr_gpt_response.rfind('}') + 1
-      curr_gpt_response = curr_gpt_response[:end_index]
-      curr_gpt_response = json.loads(curr_gpt_response)["output"]
+      curr_gpt_response = extract_json_output(GPT4_request(prompt))
+      if curr_gpt_response is None: 
+        continue
       
       if func_validate(curr_gpt_response, prompt=prompt): 
         return func_clean_up(curr_gpt_response, prompt=prompt)
@@ -141,10 +159,9 @@ def ChatGPT_safe_generate_response(prompt,
   for i in range(repeat): 
 
     try: 
-      curr_gpt_response = ChatGPT_request(prompt).strip()
-      end_index = curr_gpt_response.rfind('}') + 1
-      curr_gpt_response = curr_gpt_response[:end_index]
-      curr_gpt_response = json.loads(curr_gpt_response)["output"]
+      curr_gpt_response = extract_json_output(ChatGPT_request(prompt))
+      if curr_gpt_response is None: 
+        continue
 
       # print ("---ashdfaf")
       # print (curr_gpt_response)
@@ -208,19 +225,18 @@ def GPT_request(prompt, gpt_parameter):
   """
   temp_sleep()
   try: 
-    response = openai.Completion.create(
-                model=gpt_parameter["engine"],
-                prompt=prompt,
-                temperature=gpt_parameter["temperature"],
-                max_tokens=gpt_parameter["max_tokens"],
-                top_p=gpt_parameter["top_p"],
-                frequency_penalty=gpt_parameter["frequency_penalty"],
-                presence_penalty=gpt_parameter["presence_penalty"],
-                stream=gpt_parameter["stream"],
-                stop=gpt_parameter["stop"],)
-    return response.choices[0].text
-  except: 
-    print ("TOKEN LIMIT EXCEEDED")
+    return llm_client.chat(
+      prompt,
+      max_tokens=gpt_parameter.get("max_tokens", 1000),
+      temperature=gpt_parameter.get("temperature", 0),
+      top_p=gpt_parameter.get("top_p", 1),
+      stop=gpt_parameter.get("stop", None),
+      frequency_penalty=gpt_parameter.get("frequency_penalty", 0),
+      presence_penalty=gpt_parameter.get("presence_penalty", 0),
+      tag=gpt_parameter.get("engine", "gpt_request"),
+      continuation=True)
+  except Exception as exc: 
+    print ("TOKEN LIMIT EXCEEDED", exc)
     return "TOKEN LIMIT EXCEEDED"
 
 
@@ -266,6 +282,9 @@ def safe_generate_response(prompt,
     curr_gpt_response = GPT_request(prompt, gpt_parameter)
     if func_validate(curr_gpt_response, prompt=prompt): 
       return func_clean_up(curr_gpt_response, prompt=prompt)
+    if debug: 
+      print ("[validate] rejected attempt", i, "->", 
+             repr(str(curr_gpt_response)[:160]))
     if verbose: 
       print ("---- repeat count: ", i, curr_gpt_response)
       print (curr_gpt_response)
@@ -273,12 +292,15 @@ def safe_generate_response(prompt,
   return fail_safe_response
 
 
-def get_embedding(text, model="text-embedding-ada-002"):
-  text = text.replace("\n", " ")
-  if not text: 
+def get_embedding(text, model=None):
+  """
+  Local embedding (all-MiniLM-L6-v2 via onnxruntime) in place of OpenAI's
+  text-embedding-ada-002, which DeepSeek does not provide.
+  """
+  text = str(text).replace("\n", " ")
+  if not text.strip(): 
     text = "this is blank"
-  return openai.Embedding.create(
-          input=[text], model=model)['data'][0]['embedding']
+  return embedding_client.embed(text)
 
 
 if __name__ == '__main__':
