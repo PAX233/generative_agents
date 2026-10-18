@@ -236,6 +236,8 @@ def GPT_request(prompt, gpt_parameter):
       tag=gpt_parameter.get("engine", "gpt_request"),
       continuation=True)
   except Exception as exc: 
+    if "DEEPSEEK_API_KEY" in str(exc): 
+      raise
     print ("TOKEN LIMIT EXCEEDED", exc)
     return "TOKEN LIMIT EXCEEDED"
 

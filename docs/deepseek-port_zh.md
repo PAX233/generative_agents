@@ -38,55 +38,73 @@ requirements-deepseek.txt，不再安装原 requirements.txt 里那一堆用不�
 
 ## 3. 快速开始
 
-~~~bash
+> 本机 `D:\ga` 的 `reverie/backend_server/utils.py` 已经写好 key（该文件在
+> .gitignore 里，不会被提交）。下面的第 3 步只在你重新克隆环境时才需要做。
+
+~~~powershell
+# 0) 拿到代码
 git clone https://github.com/PAX233/generative_agents.git
 cd generative_agents
 git checkout deepseek-port
 
-# 1) 环境
+# 1) 环境（Python 3.9）
 uv venv --python 3.9 .venv
 uv pip install -r requirements-deepseek.txt
 
-# 2) 本地 embedding 模型（约 90MB，只需要下一次）
-python scripts/download_embedding_model.py
-# 国内网络可加 --mirror
+# 2) 本地 embedding 模型（约 90MB，只需要下一次；国内可加 --mirror）
+.venv\Scripts\python.exe scripts\download_embedding_model.py
 
-# 3) 配置密钥（二选一）
-cp reverie/backend_server/utils.example.py reverie/backend_server/utils.py
-# 编辑 utils.py 填入 deepseek_api_key
-export DEEPSEEK_API_KEY=sk-...        # 或者用环境变量
+# 3) 配置 DeepSeek 密钥（二选一；已经配好就跳过）
+#    方式 A：只对当前终端生效（PowerShell）
+$env:DEEPSEEK_API_KEY="sk-..."
+#    方式 B：写进本地文件（已被 .gitignore 忽略，不会被提交）
+Copy-Item reverie\backend_server\utils.example.py reverie\backend_server\utils.py
+# 然后用编辑器把 deepseek_api_key 改成你的 key
 ~~~
 
-运行（和原 README 一样，需要两个终端）：
+运行需要 **两个终端 + 一个浏览器页面**（或者用无头脚本代替浏览器）：
 
-~~~bash
-# 终端 1：环境服务器
-cd environment/frontend_server
-../../.venv/Scripts/python.exe manage.py runserver 127.0.0.1:8000
+~~~powershell
+# 终端 1：环境服务器（保持运行）
+cd D:\ga\environment\frontend_server
+..\..\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
 
-# 终端 2：后端模拟
-cd reverie/backend_server
-../../.venv/Scripts/python.exe reverie.py
-# fork 名称输入：base_the_ville_isabella_maria_klaus
-# 新模拟名称输入：my-sim
-# 然后输入：run 30
+# 终端 2：后端模拟（保持运行）
+cd D:\ga\reverie\backend_server
+..\..\.venv\Scripts\python.exe reverie.py
+# 依次输入：
+#   base_the_ville_isabella_maria_klaus
+#   my-sim
+#   run 30
 ~~~
 
-浏览器打开 <http://127.0.0.1:8000/simulator_home> 就能看到小人走动（原版流程）。
+然后在浏览器打开 <http://127.0.0.1:8000/simulator_home> 并保持这个标签页开着。
+**不打开浏览器的话，输入 run 30 后会一直卡住**，因为后端在等页面把环境数据发回来。
 
-没有图形界面时，用无头驱动代替浏览器：
+没有图形界面时，用无头驱动代替浏览器（在模拟已经创建之后、另一个终端里跑）：
 
-~~~bash
-python scripts/virtual_frontend.py --sim-code my-sim --steps 30
+~~~powershell
+cd D:\ga
+.venv\Scripts\python.exe scripts\virtual_frontend.py --sim-code my-sim --steps 30
 ~~~
 
-想从白天开始（避免整夜空跑），可以在启动后端前设置：
+想从白天开始（避免整夜空跑），启动后端前设置：
 
-~~~bash
-export GA_START_TIME="February 13, 2023, 08:00:00"
+~~~powershell
+$env:GA_START_TIME="February 13, 2023, 08:00:00"
 ~~~
 
-## 4. 实测结果
+## 4. 常见报错
+
+| 现象 | 原因 / 解决 |
+| --- | --- |
+| `DeepSeek API key is not configured` | 没配 key：按上面第 3 步设置，注意要在运行 reverie 的**同一个终端**里设 |
+| `ModuleNotFoundError: No module named 'django'` | 用了系统 python，改成 `.venv\\Scripts\\python.exe` |
+| 输入 `run 30` 后一直停在 `Enter option:` 不动 | 没开 `simulator_home` 页面，或者用虚拟前端补上驱动 |
+| `Filename too long` | 项目路径太深，放到 `D:\\ga` 这类短路径 |
+| PowerShell 里 `export` 报错 | PowerShell 用 `$env:NAME="..."`；cmd 用 `set NAME=...` |
+
+## 5. 实测结果
 
 - 3 个智能体（Isabella / Maria / Klaus），从 08:00 开始跑 **30 步**（10 秒/步，共 5 分钟游戏时间）
 - 用时约 **90 秒**，**92 次** LLM 调用，输入 75.7k token、输出 2.85k token
@@ -116,7 +134,12 @@ export GA_START_TIME="February 13, 2023, 08:00:00"
 这两次运行说明“感知 → 记忆 → 检索 → 反思/计划 → 行动 → 对话”整条链路都能跑通，
 而不只是把 API 换掉。
 
-## 5. 费用怎么看
+另外也实测了原版的三终端/浏览器流程：用无头 Chrome 打开
+`simulator_home`，后端能收到页面发回的 environment 文件并正常推进 2 步
+（`environment/0..2.json`、`movement/0..1.json` 都生成了），说明教程里的
+浏览器流程本身是可用的。
+
+## 6. 费用怎么看
 
 每次请求都会追加一行到 reverie/backend_server/llm_usage.jsonl，包含输入/输出
 token、缓存命中、估算费用。最后一次 fin 时终端也会打印一行汇总。
@@ -126,13 +149,16 @@ token、缓存命中、估算费用。最后一次 fin 时终端也会打印一�
 第一步最贵，因为要给每个智能体生成全天的计划和每小时安排；之后大部分步只是
 感知和移动，花费会小很多。
 
-## 6. 密钥安全
+## 7. 密钥安全
 
 - 密钥只放在 reverie/backend_server/utils.py 或环境变量里；
 - utils.py、llm_usage.jsonl、models/、模拟输出目录都在 .gitignore 里；
-- 提交前可以自己检查：git log -p | grep "sk-"（应该没有输出）。
+- 本机 D:\ga 的 utils.py 里已经写了这次使用的 key（方便直接跑）；如果不想
+  让 key 留在磁盘上，把那一行删掉、改用环境变量即可；
+- 提交前可以自己检查：git log -p upstream/main..HEAD | grep "sk-"
+  （应该没有输出）。
 
-## 7. 已知限制
+## 8. 已知限制
 
 - 本地 all-MiniLM-L6-v2 和 OpenAI ada-002 不是同一个模型，检索排序会有差异，
   但机制一致。
@@ -142,7 +168,7 @@ token、缓存命中、估算费用。最后一次 fin 时终端也会打印一�
 - 上游代码对 Python 3.9 + Django 2.2 的组合没问题，但需要按本仓库的
   requirements-deepseek.txt 安装，不要直接装原始 requirements.txt。
 
-## 8. 参考
+## 9. 参考
 
 - 原项目：<https://github.com/joonspk-research/generative_agents>
 - 论文：Park et al., Generative Agents: Interactive Simulacra of Human Behavior, UIST 2023

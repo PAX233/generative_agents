@@ -610,6 +610,15 @@ class ReverieServer:
 
 
 if __name__ == '__main__':
+  # Fail fast with an actionable message instead of a wall of "TOKEN LIMIT
+  # EXCEEDED" retries when the API key was never configured.
+  if not llm_client.api_key(): 
+    print ("DeepSeek API key is not configured.")
+    print ("Either export DEEPSEEK_API_KEY, or put your key into")
+    print ("reverie/backend_server/utils.py (copy it from utils.example.py).")
+    print ("Then start reverie.py again.")
+    raise SystemExit(1)
+
   # rs = ReverieServer("base_the_ville_isabella_maria_klaus", 
   #                    "July1_the_ville_isabella_maria_klaus-step-3-1")
   # rs = ReverieServer("July1_the_ville_isabella_maria_klaus-step-3-20", 
