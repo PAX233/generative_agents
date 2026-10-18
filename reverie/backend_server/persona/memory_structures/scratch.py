@@ -283,8 +283,11 @@ class Scratch:
     scratch["f_daily_schedule_hourly_org"] = self.f_daily_schedule_hourly_org
 
     scratch["act_address"] = self.act_address
-    scratch["act_start_time"] = (self.act_start_time
-                                     .strftime("%B %d, %Y, %H:%M:%S"))
+    if self.act_start_time: 
+      scratch["act_start_time"] = (self.act_start_time
+                                       .strftime("%B %d, %Y, %H:%M:%S"))
+    else: 
+      scratch["act_start_time"] = None
     scratch["act_duration"] = self.act_duration
     scratch["act_description"] = self.act_description
     scratch["act_pronunciatio"] = self.act_pronunciatio

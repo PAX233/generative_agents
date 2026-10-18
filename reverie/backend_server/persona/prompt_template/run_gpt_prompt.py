@@ -357,26 +357,34 @@ def run_gpt_prompt_task_decomp(persona,
     return prompt_input
 
   def __func_clean_up(gpt_response, prompt=""):
-    print ("TOODOOOOOO")
-    print (gpt_response)
-    print ("-==- -==- -==- ")
-
-    # TODO SOMETHING HERE sometimes fails... See screenshot
-    temp = [i.strip() for i in gpt_response.split("\n")]
-    _cr = []
+    # The upstream version assumed that every line ended with
+    # "(duration in minutes: N, minutes left: M)" and that every line after
+    # the first one started with "<n>) <first name> is ". Chat models often
+    # add a trailing sentence or repeat the numbering, which used to raise
+    # IndexError here. Parse defensively instead.
+    first_name = persona.scratch.get_str_firstname().strip()
     cr = []
-    for count, i in enumerate(temp): 
-      if count != 0: 
-        _cr += [" ".join([j.strip () for j in i.split(" ")][3:])]
-      else: 
-        _cr += [i]
-    for count, i in enumerate(_cr): 
-      k = [j.strip() for j in i.split("(duration in minutes:")]
-      task = k[0]
-      if task[-1] == ".": 
+    for raw_line in gpt_response.split("\n"):
+      line = raw_line.strip()
+      if not line or "-==-" in line: 
+        continue
+      match = re.search(r"\(duration in minutes:\s*(\d+)", line)
+      if not match: 
+        continue
+      duration = int(match.group(1))
+      task = line[:match.start()].strip()
+      task = re.sub(r"^\d+\)\s*", "", task)
+      task = re.sub(rf"^{re.escape(first_name)}\s+is\s+", "", task, 
+                    flags=re.IGNORECASE)
+      task = task.strip()
+      if task.endswith("."): 
         task = task[:-1]
-      duration = int(k[1].split(",")[0].strip())
+      if not task: 
+        continue
       cr += [[task, duration]]
+
+    if not cr: 
+      raise ValueError(f"no subtasks parsed from: {gpt_response!r}")
 
     total_expected_min = int(prompt.split("(total duration in minutes")[-1]
                                    .split("):")[0].strip())
@@ -395,7 +403,7 @@ def run_gpt_prompt_task_decomp(persona,
     curr_min_slot = curr_min_slot[1:]   
 
     if len(curr_min_slot) > total_expected_min: 
-      last_task = curr_min_slot[60]
+      last_task = curr_min_slot[min(60, len(curr_min_slot) - 1)]
       for i in range(1, 6): 
         curr_min_slot[-1 * i] = last_task
     elif len(curr_min_slot) < total_expected_min: 
@@ -414,13 +422,10 @@ def run_gpt_prompt_task_decomp(persona,
     return cr
 
   def __func_validate(gpt_response, prompt=""): 
-    # TODO -- this sometimes generates error 
     try: 
-      __func_clean_up(gpt_response)
-    except: 
-      pass
-      # return False
-    return gpt_response
+      return len(__func_clean_up(gpt_response, prompt)) > 0
+    except Exception: 
+      return False
 
   def get_fail_safe(): 
     fs = ["asleep"]

@@ -135,7 +135,9 @@ def _log_raw(tag, prompt, response, payload):
 def _clean_stop(stop):
   if not stop:
     return None
-  seqs = [s for s in stop if isinstance(s, str) and s.strip()]
+  # Note: "\n" is a valid stop sequence for DeepSeek, and the upstream
+  # prompts rely on it heavily, so only empty strings are dropped here.
+  seqs = [s for s in stop if isinstance(s, str) and s != ""]
   return seqs or None
 
 

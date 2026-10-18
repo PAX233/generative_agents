@@ -2,6 +2,12 @@
 
 # Generative Agents: Interactive Simulacra of Human Behavior 
 
+> **DeepSeek fork (branch `deepseek-port`)**: this fork swaps the OpenAI
+> backend for DeepSeek and runs the sentence embeddings locally, with token /
+> cost accounting and a browser-free runner. Setup, measured results and
+> caveats are documented in [docs/deepseek-port_zh.md](docs/deepseek-port_zh.md)
+> (中文). The upstream README below is kept unchanged.
+
 <p align="center" width="100%">
 <img src="cover.png" alt="Smallville" style="width: 80%; min-width: 300px; display: block; margin: auto;">
 </p>
