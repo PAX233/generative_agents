@@ -101,6 +101,7 @@ $env:GA_START_TIME="February 13, 2023, 08:00:00"
 | `DeepSeek API key is not configured` | 没配 key：按上面第 3 步设置，注意要在运行 reverie 的**同一个终端**里设 |
 | `ModuleNotFoundError: No module named 'django'` | 用了系统 python，改成 `.venv\\Scripts\\python.exe` |
 | 输入 `run 30` 后一直停在 `Enter option:` 不动 | 没开 `simulator_home` 页面，或者用虚拟前端补上驱动 |
+| 页面打得开、小人站着不动 | ① 终端里是否真的输入了 `run 30`；② 第一步要给三个人生成全天计划，通常要 1–3 分钟（页面会显示 “Waiting for the backend...”）；③ 标签页不要最小化或切到后台，Chrome 会暂停动画；④ 看后端终端是否在持续打印计划日志 |
 | `Filename too long` | 项目路径太深，放到 `D:\\ga` 这类短路径 |
 | PowerShell 里 `export` 报错 | PowerShell 用 `$env:NAME="..."`；cmd 用 `set NAME=...` |
 

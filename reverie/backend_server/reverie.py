@@ -436,6 +436,9 @@ class ReverieServer:
     print ("constructs powered by generative agents architecture and LLM. We")
     print ("clarify that these agents lack human-like agency, consciousness,")
     print ("and independent decision-making.\n---")
+    print ("Tip: open http://localhost:8000/simulator_home in your browser,")
+    print ("keep that tab visible, then type 'run 30' here. The first step can")
+    print ("take a couple of minutes while the agents plan their day.\n---")
 
     # <sim_folder> points to the current simulation folder.
     sim_folder = f"{fs_storage}/{self.sim_code}"

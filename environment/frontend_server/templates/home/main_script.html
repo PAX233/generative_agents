@@ -365,6 +365,12 @@
 	    player.body.setVelocityY(camera_speed);
 	  }
 
+	  // Show a hint while we wait for the backend to compute the next step.
+	  let backend_status_el = document.getElementById("backend-status");
+	  if (backend_status_el) {
+	    backend_status_el.style.display = (phase == "update") ? "block" : "none";
+	  }
+
 	  // console.log("phase: " + phase + ", step: " + step);
 	  // *** MOVE PERSONAS ***
 	  // Moving personas take place in three distinct phases: "process," "update,"
